@@ -4,6 +4,7 @@
 #include <QCloseEvent>
 #include <QMainWindow>
 #include <QMenu>
+#include <vector>
 
 #include "../Common/CommonTypes.h"
 #include "../Common/MemoryCommon.h"
@@ -29,7 +30,10 @@ public:
   void onHookAttempt();
   void onUnhook();
   void onOpenMemViewer();
+  void makeNewMemViewer();
+  void onOpenNewMemViewer();
   void onOpenMemViewerWithAddress(u32 address);
+  void onOpenNewMemViewerWithAddress(u32 address);
   void updateMem2Status();
 
   void onOpenWatchFile();
@@ -46,12 +50,13 @@ private:
   void makeMenus();
   void initialiseWidgets();
   void makeLayouts();
-  void makeMemViewer();
+  MemViewerWidget* makeMemViewer();
   void firstHookAttempt();
 
   MemWatchWidget* m_watcher;
   MemScanWidget* m_scanner;
-  MemViewerWidget* m_viewer;
+  std::vector<MemViewerWidget*> m_viewers;
+
 
   QLabel* m_lblDolphinStatus;
   QPushButton* m_btnAttempHook;

@@ -19,13 +19,16 @@ MainWindow::MainWindow()
   makeLayouts();
   makeMenus();
   DolphinComm::DolphinAccessor::init();
-  makeMemViewer();
   firstHookAttempt();
 }
 
 MainWindow::~MainWindow()
 {
-  delete m_viewer;
+  for(int i = 0; i < m_viewers.size(); i++)
+  {
+    delete m_viewers[i];
+  }
+  m_viewers.clear();
   delete m_watcher;
   DolphinComm::DolphinAccessor::free();
 }
@@ -117,8 +120,10 @@ void MainWindow::initialiseWidgets()
   m_lblMem2Status = new QLabel("");
   m_lblMem2Status->setAlignment(Qt::AlignHCenter);
 
-  m_btnOpenMemViewer = new QPushButton(tr("Open memory viewer"));
+  m_btnOpenMemViewer = new QPushButton(tr("Open a memory viewer"));
   connect(m_btnOpenMemViewer, &QPushButton::clicked, this, &MainWindow::onOpenMemViewer);
+
+  connect(m_watcher, &MemWatchWidget::goToAddressInViewer, this, &MainWindow::onOpenMemViewerWithAddress);
 }
 
 void MainWindow::makeLayouts()
@@ -146,13 +151,20 @@ void MainWindow::makeLayouts()
   setCentralWidget(mainWidget);
 }
 
-void MainWindow::makeMemViewer()
+MemViewerWidget* MainWindow::makeMemViewer()
 {
-  m_viewer = new MemViewerWidget(nullptr, Common::MEM1_START);
-  connect(m_viewer, &MemViewerWidget::mustUnhook, this, &MainWindow::onUnhook);
-  connect(m_viewer, &MemViewerWidget::addWatchRequested, m_watcher, &MemWatchWidget::addWatchEntry);
-  connect(m_watcher, &MemWatchWidget::goToAddressInViewer, this,
-          &MainWindow::onOpenMemViewerWithAddress);
+  MemViewerWidget* new_viewer = new MemViewerWidget(nullptr, Common::MEM1_START);
+  m_viewers.push_back(new_viewer);
+  connect(new_viewer, &MemViewerWidget::mustUnhook, this, &MainWindow::onUnhook);
+  connect(new_viewer, &MemViewerWidget::addWatchRequested, m_watcher, &MemWatchWidget::addWatchEntry);
+  new_viewer->getUpdateTimer()->start(SConfig::getInstance().getViewerUpdateTimerMs());
+  //hopefully this manages memory for me
+  connect(new_viewer, &QObject::destroyed, [this](QObject *obj){
+      auto newend = std::remove(m_viewers.begin(), m_viewers.end(), obj);
+      m_viewers.erase(newend, m_viewers.end());
+  });
+  new_viewer->setAttribute(Qt::WA_DeleteOnClose);
+  return new_viewer;
 }
 
 void MainWindow::firstHookAttempt()
@@ -197,14 +209,15 @@ void MainWindow::addWatchRequested(u32 address, Common::MemType type, size_t len
 
 void MainWindow::onOpenMemViewer()
 {
-  m_viewer->show();
-  m_viewer->raise();
+  MemViewerWidget* viewer = makeMemViewer();
+  viewer->show();
 }
 
 void MainWindow::onOpenMemViewerWithAddress(u32 address)
 {
-  m_viewer->goToAddress(address);
-  m_viewer->show();
+  MemViewerWidget* viewer = makeMemViewer();
+  viewer->goToAddress(address);
+  viewer->show();
 }
 
 void MainWindow::updateMem2Status()
@@ -225,7 +238,10 @@ void MainWindow::updateMem2Status()
       strAram = tr(", the ARAM is inaccessible, turn off MMU to use it");
   }
   m_lblMem2Status->setText(strMem2 + strAram);
-  m_viewer->onMEM2StatusChanged(DolphinComm::DolphinAccessor::isMEM2Present());
+  for(int i = 0; i < m_viewers.size(); i++)
+  {
+    m_viewers[i]->onMEM2StatusChanged(DolphinComm::DolphinAccessor::isMEM2Present());
+  }
 }
 
 void MainWindow::updateDolphinHookingStatus()
@@ -288,8 +304,11 @@ void MainWindow::onHookAttempt()
     m_scanner->getUpdateTimer()->start(SConfig::getInstance().getScannerUpdateTimerMs());
     m_watcher->getUpdateTimer()->start(SConfig::getInstance().getWatcherUpdateTimerMs());
     m_watcher->getFreezeTimer()->start(SConfig::getInstance().getFreezeTimerMs());
-    m_viewer->getUpdateTimer()->start(SConfig::getInstance().getViewerUpdateTimerMs());
-    m_viewer->hookStatusChanged(true);
+    for(int i = 0; i < m_viewers.size(); i++)
+    {
+      m_viewers[i]->getUpdateTimer()->start(SConfig::getInstance().getViewerUpdateTimerMs());
+      m_viewers[i]->hookStatusChanged(true);
+    }
     updateMem2Status();
   }
 }
@@ -299,8 +318,11 @@ void MainWindow::onUnhook()
   m_scanner->getUpdateTimer()->stop();
   m_watcher->getUpdateTimer()->stop();
   m_watcher->getFreezeTimer()->stop();
-  m_viewer->getUpdateTimer()->stop();
-  m_viewer->hookStatusChanged(false);
+  for(int i = 0; i < m_viewers.size(); i++)
+  {
+    m_viewers[i]->getUpdateTimer()->stop();
+    m_viewers[i]->hookStatusChanged(false);
+  }
   m_lblMem2Status->setText(QString(""));
   DolphinComm::DolphinAccessor::unHook();
   updateDolphinHookingStatus();
@@ -347,14 +369,20 @@ void MainWindow::onOpenSettings()
     m_scanner->getUpdateTimer()->stop();
     m_watcher->getUpdateTimer()->stop();
     m_watcher->getFreezeTimer()->stop();
-    m_viewer->getUpdateTimer()->stop();
+    for(int i = 0; i < m_viewers.size(); i++)
+    {
+      m_viewers[i]->getUpdateTimer()->stop();
+    }
     if (DolphinComm::DolphinAccessor::getStatus() ==
         DolphinComm::DolphinAccessor::DolphinStatus::hooked)
     {
       m_scanner->getUpdateTimer()->start(SConfig::getInstance().getScannerUpdateTimerMs());
       m_watcher->getUpdateTimer()->start(SConfig::getInstance().getWatcherUpdateTimerMs());
       m_watcher->getFreezeTimer()->start(SConfig::getInstance().getFreezeTimerMs());
-      m_viewer->getUpdateTimer()->start(SConfig::getInstance().getViewerUpdateTimerMs());
+      for(int i = 0; i < m_viewers.size(); i++)
+      {
+        m_viewers[i]->getUpdateTimer()->start(SConfig::getInstance().getViewerUpdateTimerMs());
+      }
     }
   }
 }
@@ -379,7 +407,11 @@ void MainWindow::closeEvent(QCloseEvent* event)
 {
   if (m_watcher->warnIfUnsavedChanges())
   {
-    m_viewer->close();
+    for(int i = 0; i < m_viewers.size(); i++)
+    {
+      m_viewers[i]->close();
+    }
+    //TODO: handle bonus viewers
     event->accept();
   }
   else
