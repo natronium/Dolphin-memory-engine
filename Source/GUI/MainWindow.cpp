@@ -118,7 +118,7 @@ void MainWindow::initialiseWidgets()
   m_lblMem2Status->setAlignment(Qt::AlignHCenter);
 
   m_btnOpenMemViewer = new QPushButton(tr("Open memory viewer"));
-  connect(m_btnOpenMemViewer, &QPushButton::clicked, this, &MainWindow::onOpenMenViewer);
+  connect(m_btnOpenMemViewer, &QPushButton::clicked, this, &MainWindow::onOpenMemViewer);
 }
 
 void MainWindow::makeLayouts()
@@ -195,7 +195,7 @@ void MainWindow::addWatchRequested(u32 address, Common::MemType type, size_t len
   m_watcher->addWatchEntry(newEntry);
 }
 
-void MainWindow::onOpenMenViewer()
+void MainWindow::onOpenMemViewer()
 {
   m_viewer->show();
   m_viewer->raise();

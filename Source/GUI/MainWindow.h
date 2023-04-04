@@ -28,7 +28,7 @@ public:
   void updateDolphinHookingStatus();
   void onHookAttempt();
   void onUnhook();
-  void onOpenMenViewer();
+  void onOpenMemViewer();
   void onOpenMemViewerWithAddress(u32 address);
   void updateMem2Status();
 
