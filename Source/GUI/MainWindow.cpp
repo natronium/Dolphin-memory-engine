@@ -164,6 +164,7 @@ MemViewerWidget* MainWindow::makeMemViewer()
       m_viewers.erase(newend, m_viewers.end());
   });
   new_viewer->setAttribute(Qt::WA_DeleteOnClose);
+  new_viewer->setWindowTitle(QString::fromStdString("DME Memory Viewer #" + std::to_string(m_viewers.size())));
   return new_viewer;
 }
 
