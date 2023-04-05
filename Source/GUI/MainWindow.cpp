@@ -217,6 +217,7 @@ void MainWindow::onOpenMemViewer()
 void MainWindow::onOpenMemViewerWithAddress(u32 address)
 {
   MemViewerWidget* viewer = makeMemViewer();
+  viewer->setWindowTitle(QString::fromStdString("DME Memory Viewer @" + std::to_string(address)));
   viewer->goToAddress(address);
   viewer->show();
 }
